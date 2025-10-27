@@ -1,0 +1,153 @@
+/* Reset cơ bản */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body,
+#root {
+    height: 100%;
+    width: 100%;
+}
+
+
+/* Root background và canh giữa app */
+
+body {
+    background: url('./assets/bg.jpg') center/cover no-repeat fixed;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+
+/* Trung tâm hoá app, có khoảng đệm quanh viewport */
+
+.app-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+
+/* Container chính cân đối ngang/dọc */
+
+.app-container {
+    display: grid;
+    grid-template-columns: 240px 1fr 300px;
+    /* sidebar - main - right */
+    gap: 18px;
+    width: min(1200px, calc(100vw - 48px));
+    height: min(900px, calc(100vh - 48px));
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+}
+
+
+/* Sidebar / Main / Right sidebar */
+
+.app-container>.sidebar,
+.app-container>.right-sidebar {
+    background: rgba(0, 0, 0, 0.25);
+    padding: 18px;
+    overflow-y: auto;
+}
+
+.app-container>.main-content {
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+
+/* Dashboard layout inside main */
+
+.dashboard-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+}
+
+
+/* Make login full-center if rendered alone */
+
+.login-page,
+.login-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100vh;
+}
+
+
+/* Scrollbar custom (subtle) */
+
+.app-container ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.app-container ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.app-container ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+}
+
+
+/* Responsive: collapse sidebars on small screens */
+
+@media (max-width: 1100px) {
+    .app-container {
+        grid-template-columns: 200px 1fr 200px;
+        width: calc(100vw - 32px);
+        height: calc(100vh - 32px);
+    }
+}
+
+@media (max-width: 900px) {
+    .app-container {
+        grid-template-columns: 1fr;
+        /* stack vertically */
+        grid-template-rows: auto 1fr auto;
+        /* sidebar, main, right as stacked blocks */
+        width: calc(100vw - 20px);
+        height: calc(100vh - 20px);
+    }
+    .app-container>.sidebar,
+    .app-container>.right-sidebar {
+        height: auto;
+        max-height: 80px;
+        overflow: hidden;
+    }
+    .app-container>.main-content {
+        height: 100%;
+        overflow-y: auto;
+    }
+}
+
+
+/* Small tweak for main content to avoid inner overflow when fixed height */
+
+.main-content>* {
+    max-width: 100%;
+}

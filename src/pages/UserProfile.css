@@ -1,0 +1,197 @@
+/* Tổng thể */
+
+.profile-container {
+    padding: 32px 16px;
+    /* bg-gray-50 */
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.profile-wrapper {
+    max-width: 650px;
+    width: 100%;
+    background: rgba(50, 50, 50, 0.1);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    padding: 2.5rem;
+    /* 40px */
+    border-radius: 0.75rem;
+    /* 12px */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    /* border-gray-200 */
+}
+
+
+/* Tiêu đề */
+
+.profile-title {
+    font-size: 1.875rem;
+    /* 30px */
+    font-weight: 700;
+    color: #111827;
+    /* text-gray-900 */
+    text-align: center;
+    margin: 0 0 0.5rem 0;
+}
+
+.profile-subtitle {
+    font-size: 1rem;
+    color: #6b7280;
+    /* text-gray-500 */
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+
+/* Form */
+
+.profile-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    /* 20px */
+}
+
+.form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    /* 8px */
+}
+
+.form-label {
+    font-size: 0.875rem;
+    /* 14px */
+    font-weight: 500;
+    color: #374151;
+    /* text-gray-700 */
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-label svg {
+    color: #9ca3af;
+    /* text-gray-400 */
+}
+
+
+/* Inputs & Select */
+
+.form-input,
+.form-select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    /* 12px 16px */
+    font-size: 1rem;
+    /* border-gray-300 */
+    border-radius: 0.5rem;
+    /* 8px */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -webkit-appearance: none;
+    /* Tắt style mặc định của trình duyệt */
+    -moz-appearance: none;
+    appearance: none;
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+.form-input:focus,
+.form-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    /* border-blue-500 */
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.form-select {
+    /* Thêm mũi tên cho select box */
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1.25em;
+    padding-right: 2.5rem;
+}
+
+
+/* Nút bấm */
+
+.form-action-area {
+    margin-top: 1rem;
+    border-top: 1px solid #f3f4f6;
+    /* border-gray-100 */
+    padding-top: 1.5rem;
+}
+
+.save-button {
+    width: 100%;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: white;
+    background-color: #3b82f6;
+    /* bg-blue-600 */
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.2s, opacity 0.2s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 48px;
+    /* Giữ chiều cao ổn định khi text thay đổi */
+}
+
+.save-button:hover {
+    background-color: #2563eb;
+    /* bg-blue-700 */
+}
+
+.save-button:disabled {
+    background-color: #9ca3af;
+    /* bg-gray-400 */
+    cursor: not-allowed;
+}
+
+.save-button .button-text {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+
+/* Trạng thái thành công của nút */
+
+.save-button[disabled] .button-text {
+    /* Khi ở trạng thái success, đổi màu nút */
+    color: white;
+}
+
+.save-button[disabled] {
+    background-color: #22c55e;
+    /* bg-green-500 */
+    opacity: 1;
+}
+
+
+/* Responsive: 2 cột cho Tên/Họ và Cao/Nặng trên màn hình lớn */
+
+@media (min-width: 640px) {
+    .form-row {
+        flex-direction: row;
+        gap: 1.5rem;
+    }
+    .form-row .form-group {
+        flex: 1;
+        /* Chia đều không gian */
+    }
+}

@@ -1,0 +1,54 @@
+/* src/ChartSection.css */
+
+.chart-section {
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.chart-section h2 {
+    text-align: center;
+    color: #333;
+    margin-top: 20px;
+}
+
+
+/* Định kiểu cho vùng chứa biểu đồ để đảm bảo ResponsiveContainer hoạt động */
+
+.chart-container {
+    width: 100%;
+    /* Đặt chiều cao cố định hoặc sử dụng ResponsiveContainer với height */
+    /* Chiều cao đã được đặt trong JSX (height={300}) */
+}
+
+
+/* Định kiểu cho Custom Tooltip */
+
+.custom-tooltip {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    font-size: 14px;
+}
+
+.custom-tooltip .label {
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #555;
+}
+
+.custom-tooltip .net-calories {
+    margin-top: 5px;
+    padding-top: 5px;
+    border-top: 1px solid #eee;
+    font-weight: bold;
+    color: #444;
+}
