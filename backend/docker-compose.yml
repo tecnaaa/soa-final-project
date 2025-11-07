@@ -1,0 +1,47 @@
+version: "3.8"
+
+services:
+  auth:
+    build: ./services/auth
+    ports:
+      - "8001:8001"
+    environment:
+      - PYTHONUNBUFFERED=1
+  users:
+    build: ./services/users
+    ports:
+      - "8002:8002"
+    environment:
+      - PYTHONUNBUFFERED=1
+  nutrition:
+    build: ./services/nutrition
+    ports:
+      - "8003:8003"
+    environment:
+      - PYTHONUNBUFFERED=1
+  payment:
+    build: ./services/payment
+    ports:
+      - "8004:8004"
+    environment:
+      - PYTHONUNBUFFERED=1
+  workout:
+    build: ./services/workout
+    ports:
+      - "8005:8005"
+    environment:
+      - PYTHONUNBUFFERED=1
+  calories:
+    build: ./services/calories
+    ports:
+      - "8006:8006"
+    environment:
+      - PYTHONUNBUFFERED=1
+  coaching:
+    build: ./services/coaching
+    ports:
+      - "8007:8007"
+    environment:
+      - PYTHONUNBUFFERED=1
+
+# Optional: add networks, volumes, or a shared DB service later
