@@ -13,6 +13,9 @@ services:
       - "8002:8002"
     environment:
       - PYTHONUNBUFFERED=1
+      - USERS_DATABASE_URL=mysql+aiomysql://dbuser:secret@mysql:3306/user_db
+    depends_on:
+      - mysql
   nutrition:
     build: ./services/nutrition
     ports:
@@ -44,4 +47,32 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
 
-# Optional: add networks, volumes, or a shared DB service later
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: user_db
+      MYSQL_USER: dbuser
+      MYSQL_PASSWORD: secret
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: rootpassword
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+
+volumes:
+  mysql-data:
+
+# Optional: add networks later
