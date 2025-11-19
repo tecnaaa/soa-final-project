@@ -1,0 +1,30 @@
+- link từ các content, icon
+- phân quyền pt -> coaching
+
+
+Bổ sung Form cho Nutrition: Nutrition.jsx cần các nút/form để gọi nutritionAPI.logMeal (đã có sẵn).
+
+//Kết nối trang CaloriesCounting.jsx vào DashboardCard và sử dụng user_id từ AuthContext thay vì hardcode.
+
+Tích hợp Stripe.js: Cần thay thế setTimeout trong Payment.jsx bằng logic gọi Stripe.js.
+
+
+
+
+
+- số dư người dùng để thanh toán gói
+- biểu đồ hoạt động theo tuần
+- giao diện coaching user-pt (nếu có đk)
+
+
+
+Sửa lại logic hệ thống:
+- NGười dùng không thể tạo bữa ăn hay bài tập mới, nếu chỉ dùng gói miễn phí thì mặc định sẽ nhận được nutrition và workout mặc định của hệ thống
+- Chỉ PT mới có thể tạo nutrition và workout
+- Thêm tính năng update ảnh hồ sơ user
+
+
+tôi cần chỉnh lại logic avatar người dùng hiện tại, nếu người dùng chưa cập nhật avatar thì mặc định đường dẫn avt sẽ là backend/uploads/default.webp, còn nếu người dùng muốn upload avatar lên thì avt cũng sẽ được lưu trong folder uploads đó, tên của file avatar sẽ trùng với user_id để dễ quản lí và khi họ đổi thêm lần nữa thì trước khi hệ thống lưu avatar mới xuống uploads/ thì phải xóa avatar cũ rồi gán tên của avatar cũ đó cho avt mới
+
+
+

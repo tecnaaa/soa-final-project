@@ -1,0 +1,364 @@
+version: "3.8"
+
+services:
+  # RabbitMQ - Message Queue for Event-Driven Architecture
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: fitness_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"    # AMQP port
+      - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+  # Redis - Caching layer
+  redis:
+    image: redis:7-alpine
+    container_name: fitness_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # MySQL Database - Start first
+  db:
+    image: mysql:8.0
+    container_name: fitness_mysql_db
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_INITDB_SKIP_TZINFO: 1
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/schema:/docker-entrypoint-initdb.d
+    networks:
+      - soa-network
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --default-storage-engine=InnoDB 
+      --sql-mode="" 
+      --max_connections=1000 
+      --character-set-server=utf8mb4 
+      --collation-server=utf8mb4_unicode_ci
+      --explicit_defaults_for_timestamp=ON
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppassword", "--silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+    restart: unless-stopped
+    cap_add:
+      - SYS_NICE
+
+  # Seed Manager Service - Runs seeds once after DB is ready
+  seed_manager:
+    build:
+      context: .
+      dockerfile: backend/services/seed_manager/Dockerfile
+    container_name: fitness_seed_manager
+    environment:
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASSWORD=password
+      - DATABASE_URL=mysql+pymysql://root:password@db:3306/users_db?charset=utf8mb4
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - soa-network
+    restart: "no"  # Run once only
+
+  # API Gateway
+  api_gateway:
+    build:
+      context: .
+      dockerfile: backend/services/api_gateway/Dockerfile
+    container_name: fitness_api_gateway
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend/uploads:/app/backend/uploads
+    environment:
+      - SECRET_KEY=your-secret-key-change-this-in-production
+      - JWT_SECRET_KEY=your-jwt-secret-key-change-this-in-production
+      - FRONTEND_URL=http://localhost:5173
+      - USERS_SERVICE_URL=http://users:8002
+      - WORKOUT_SERVICE_URL=http://workout:8003
+      - NUTRITION_SERVICE_URL=http://nutrition:8004
+      - CALORIES_SERVICE_URL=http://calories:8005
+      - PAYMENT_SERVICE_URL=http://payment:8007
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq/
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seed_manager:
+        condition: service_completed_successfully
+      users:
+        condition: service_healthy
+      workout:
+        condition: service_healthy
+      nutrition:
+        condition: service_healthy
+      calories:
+        condition: service_healthy
+      payment:
+        condition: service_healthy
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Users Service
+  users:
+    build:
+      context: .
+      dockerfile: backend/services/users/Dockerfile
+    container_name: fitness_users_service
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./backend/uploads:/app/backend/uploads
+    environment:
+      - DATABASE_URL=mysql+pymysql://root:password@db:3306/users_db?charset=utf8mb4
+      - SECRET_KEY=your-secret-key-change-this-in-production
+      - JWT_SECRET_KEY=your-jwt-secret-key-change-this-in-production
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq/
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=production
+      - SENTRY_DSN=
+      - PYTHONUNBUFFERED=1
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SENDER_EMAIL=${SENDER_EMAIL}
+      - SENDER_NAME=${SENDER_NAME}
+      - FRONTEND_URL=${FRONTEND_URL}
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Workout Service
+  workout:
+    build:
+      context: .
+      dockerfile: backend/services/workout/Dockerfile
+    container_name: fitness_workout_service
+    ports:
+      - "8003:8003"
+    environment:
+      - DATABASE_URL=mysql+pymysql://root:password@db:3306/workout_db?charset=utf8mb4
+      - PAYMENT_SERVICE_URL=http://payment:8007
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq/
+      - REDIS_URL=redis://redis:6379/1
+      - ENVIRONMENT=production
+      - SENTRY_DSN=
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      users:
+        condition: service_healthy
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Nutrition Service
+  nutrition:
+    build:
+      context: .
+      dockerfile: backend/services/nutrition/Dockerfile
+    container_name: fitness_nutrition_service
+    ports:
+      - "8004:8004"
+    environment:
+      - DATABASE_URL=mysql+pymysql://root:password@db:3306/nutrition_db?charset=utf8mb4
+      - CALORIES_SERVICE_URL=http://calories:8005
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq/
+      - REDIS_URL=redis://redis:6379/2
+      - ENVIRONMENT=production
+      - SENTRY_DSN=
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      calories:
+        condition: service_healthy
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Calories Service
+  calories:
+    build:
+      context: .
+      dockerfile: backend/services/calories/Dockerfile
+    container_name: fitness_calories_service
+    ports:
+      - "8005:8005"
+    environment:
+      - DATABASE_URL=mysql+pymysql://root:password@db:3306/calories_db?charset=utf8mb4
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq/
+      - REDIS_URL=redis://redis:6379/3
+      - ENVIRONMENT=production
+      - SENTRY_DSN=
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      users:
+        condition: service_healthy
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Payment Service
+  payment:
+    build:
+      context: .
+      dockerfile: backend/services/payment/Dockerfile
+    container_name: fitness_payment_service
+    ports:
+      - "8007:8007"
+    environment:
+      - DATABASE_URL=mysql+pymysql://root:password@db:3306/payment_db?charset=utf8mb4
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-sk_test_dummy_key_change_this}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-whsec_test_dummy_key_change_this}
+      - SECRET_KEY=your-secret-key-change-this-in-production
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq/
+      - REDIS_URL=redis://redis:6379/5
+      - ENVIRONMENT=production
+      - SENTRY_DSN=
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      users:
+        condition: service_healthy
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Frontend Vite Dev Server
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fitness_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8001
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+    networks:
+      - soa-network
+    depends_on:
+      api_gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  mysql_data:
+  rabbitmq_data:
+  redis_data:
+
+networks:
+  soa-network:
+    driver: bridge

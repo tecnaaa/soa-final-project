@@ -1,7 +1,7 @@
 import "./Sidebar.css";
 import { Link } from "react-router-dom";
 
-import { Calendar, Leaf, Flame, User, CreditCard, UserCircle } from "phosphor-react";
+import { Calendar, Leaf, Flame, User, CreditCard, UserCircle, Barbell} from "phosphor-react";
 function GlassIconComp({ Icon, label }) {
   return (
     <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-lg p-3 flex flex-col items-center hover:bg-white/20 transition-colors">
@@ -35,6 +35,11 @@ export default function Sidebar() {
         <li>
           <Link to="/payment">
             <GlassIconComp Icon={CreditCard} />
+          </Link>
+        </li>
+        <li>
+          <Link to="/workout">
+            <GlassIconComp Icon={Barbell} />
           </Link>
         </li>
         <li>

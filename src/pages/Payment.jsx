@@ -1,105 +1,195 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Crown, CheckCircle, XCircle, Prohibit } from "phosphor-react";
-import "./Payment.css"; // File CSS chúng ta sẽ tạo ở bước 2
+import { useAuth } from "../context/AuthContext";
+import "./Payment.css";
 
-// --- DỮ LIỆU GIẢ LẬP (MOCK DATA) ---
-// Dựa trên bảng 'subscriptions'
-const MOCK_SUBSCRIPTIONS = [
-  {
-    subscription_id: 1,
-    subscription_name: "Gói Premium",
-    price: 150000,
-    duration_days: 30,
-    description: "Truy cập tất cả bài tập và kế hoạch dinh dưỡng.",
-  },
-  {
-    subscription_id: 2,
-    subscription_name: "Gói Coaching 1-1",
-    price: 2500000,
-    duration_days: 30,
-    description: "Nhận hướng dẫn trực tiếp từ Huấn Luyện Viên.",
-  },
-];
-
-// Dựa trên bảng 'user_subscriptions' (Giả sử user đang dùng gói Free)
-const MOCK_CURRENT_USER_SUB = {
-  user_subscription_id: null,
-  subscription_id: null, // null = Gói Free
-  subscription_name: "Gói Free",
-  end_date: "Vĩnh viễn",
-};
-
-// --- COMPONENT ---
 const Payment = () => {
-  // State chứa gói hiện tại của user
-  const [currentSub, setCurrentSub] = useState(MOCK_CURRENT_USER_SUB);
-  
-  // State chứa các gói có sẵn để mua
-  const [packages, setPackages] = useState(MOCK_SUBSCRIPTIONS);
-  
-  // State theo dõi gói đang được chọn
+  const { user } = useAuth();
+  const [currentSub, setCurrentSub] = useState(null);
+  const [packages, setPackages] = useState([]);
   const [selectedPackageId, setSelectedPackageId] = useState(null);
-  
-  // State quản lý trạng thái thanh toán
-  const [paymentStatus, setPaymentStatus] = useState("idle"); // idle | processing | success | failed
+  const [paymentStatus, setPaymentStatus] = useState("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  // Hàm mô phỏng thanh toán
-  const handlePayment = () => {
+  // Fetch subscriptions and current user subscription from API
+  useEffect(() => {
+    const fetchSubscriptions = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+
+        // Fetch available subscriptions
+        const subResponse = await fetch('http://localhost:8007/subscription-plans', {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        let availablePackages = [];
+        if (subResponse.ok) {
+          const subData = await subResponse.json();
+          availablePackages = subData.plans || [];
+        } else {
+          // Fallback mock data
+          availablePackages = [
+            {
+              subscription_id: 1,
+              subscription_name: "Gói Premium",
+              price: 150000,
+              duration_days: 30,
+              description: "Truy cập tất cả bài tập và kế hoạch dinh dưỡng.",
+            },
+            {
+              subscription_id: 2,
+              subscription_name: "Gói Coaching 1-1",
+              price: 2500000,
+              duration_days: 30,
+              description: "Nhận hướng dẫn trực tiếp từ Huấn Luyện Viên.",
+            },
+          ];
+        }
+        setPackages(availablePackages);
+
+        // Fetch current user subscription
+        if (user && user.user_id) {
+          const currentSubResponse = await fetch(
+            `http://localhost:8007/subscriptions/user/${user.user_id}`,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              }
+            }
+          );
+
+          if (currentSubResponse.ok) {
+            const currentSubData = await currentSubResponse.json();
+            setCurrentSub(currentSubData);
+          } else {
+            // Fallback - user is on free plan
+            setCurrentSub({
+              user_subscription_id: null,
+              subscription_id: null,
+              subscription_name: "Gói Free",
+              end_date: "Vĩnh viễn",
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching subscriptions:', err);
+        // Use fallback mock data
+        setPackages([
+          {
+            subscription_id: 1,
+            subscription_name: "Gói Premium",
+            price: 150000,
+            duration_days: 30,
+            description: "Truy cập tất cả bài tập và kế hoạch dinh dưỡng.",
+          },
+          {
+            subscription_id: 2,
+            subscription_name: "Gói Coaching 1-1",
+            price: 2500000,
+            duration_days: 30,
+            description: "Nhận hướng dẫn trực tiếp từ Huấn Luyện Viên.",
+          },
+        ]);
+        setCurrentSub({
+          user_subscription_id: null,
+          subscription_id: null,
+          subscription_name: "Gói Free",
+          end_date: "Vĩnh viễn",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSubscriptions();
+  }, [user]);
+
+  const handlePayment = async () => {
     if (!selectedPackageId) return;
 
     setPaymentStatus("processing");
     setErrorMessage("");
 
-    // Tìm thông tin gói đã chọn
-    const selectedPkg = packages.find(
-      (p) => p.subscription_id === selectedPackageId
-    );
+    const selectedPkg = packages.find((p) => p.subscription_id === selectedPackageId);
 
-    // --- BẮT ĐẦU MÔ PHỎNG API CALL ---
-    console.log(`Đang xử lý thanh toán cho gói: ${selectedPkg.subscription_name}`);
-    setTimeout(() => {
-      // Mô phỏng 5% tỷ lệ thất bại
-      if (Math.random() < 0.05) {
-        setPaymentStatus("failed");
-        setErrorMessage("Giao dịch thất bại. Vui lòng thử lại.");
-        console.error("Mô phỏng: Thanh toán thất bại.");
-      } else {
-        // --- MÔ PHỎNG THÀNH CÔNG ---
+    try {
+      const token = localStorage.getItem('token');
+
+      // Call Stripe payment intent API
+      const paymentResponse = await fetch('http://localhost:8007/create-payment-intent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          amount: selectedPkg.price,
+          user_id: user.user_id,
+          subscription_id: selectedPkg.subscription_id
+        })
+      });
+
+      if (!paymentResponse.ok) {
+        throw new Error('Thanh toán thất bại');
+      }
+
+      const paymentData = await paymentResponse.json();
+
+      // In production, would integrate with Stripe here
+      // For now, simulate success
+      setTimeout(() => {
         setPaymentStatus("success");
-        console.log("Mô phỏng: Thanh toán THÀNH CÔNG.");
 
-        // 1. Cập nhật gói hiện tại của user (cập nhật UI)
+        // Update current subscription
         const newEndDate = new Date();
         newEndDate.setDate(newEndDate.getDate() + selectedPkg.duration_days);
-        
+
         setCurrentSub({
-          user_subscription_id: Math.floor(Math.random() * 10000), // ID ngẫu nhiên
+          user_subscription_id: Math.floor(Math.random() * 10000),
           subscription_id: selectedPkg.subscription_id,
           subscription_name: selectedPkg.subscription_name,
-          end_date: newEndDate.toISOString().split("T")[0], // Format: YYYY-MM-DD
+          end_date: newEndDate.toISOString().split("T")[0],
         });
 
-        // 2. Gửi thông tin cho User Service (như yêu cầu)
-        console.log(
-          `%c[GỬI TỚI USER SERVICE]: Cập nhật role cho UserID [123] thành [${selectedPkg.subscription_name}]`,
-          "color: blue; font-weight: bold;"
-        );
-        
-        // Reset lựa chọn
         setSelectedPackageId(null);
-      }
-    }, 2000); // Giả lập 2 giây xử lý
+      }, 2000);
+
+    } catch (err) {
+      console.error('Payment error:', err);
+      setPaymentStatus("failed");
+      setErrorMessage(err.message || "Giao dịch thất bại. Vui lòng thử lại.");
+    }
   };
 
-  // Hàm helper để format tiền
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
       currency: "VND",
     }).format(amount);
   };
+
+  if (loading) {
+    return (
+      <motion.div className="payment-container">
+        <div>Đang tải dữ liệu...</div>
+      </motion.div>
+    );
+  }
+
+  if (!currentSub) {
+    return (
+      <motion.div className="payment-container">
+        <div>Không thể tải thông tin thanh toán</div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -110,7 +200,6 @@ const Payment = () => {
       <div className="payment-wrapper">
         <h1 className="payment-main-title">Thanh toán & Nâng cấp</h1>
 
-        {/* 1. HIỂN THỊ GÓI HIỆN TẠI */}
         <motion.div
           className="current-plan-card"
           initial={{ opacity: 0, y: 10 }}
@@ -126,7 +215,6 @@ const Payment = () => {
           </p>
         </motion.div>
 
-        {/* 2. CHỌN GÓI NÂNG CẤP */}
         <h2 className="package-selection-title">Chọn gói để nâng cấp</h2>
         <div className="package-selection-container">
           {packages.map((pkg) => {
@@ -161,7 +249,6 @@ const Payment = () => {
           })}
         </div>
 
-        {/* 3. NÚT THANH TOÁN VÀ PHẢN HỒI */}
         <div className="payment-action-area">
           <button
             className="pay-button"
@@ -176,7 +263,6 @@ const Payment = () => {
                 )}`}
           </button>
 
-          {/* Khu vực hiển thị thông báo động */}
           <AnimatePresence>
             {paymentStatus === "success" && (
               <motion.div

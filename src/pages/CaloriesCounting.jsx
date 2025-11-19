@@ -1,34 +1,78 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Flame, Knife, Activity, Calculator } from "phosphor-react";
+import { calorieAPI } from "../utils/api";
 import "./CaloriesCounting.css";
 
 // Define thresholds as constants
-const THRESHOLD_GOOD_BURN = -500; // Ngưỡng đốt calo tốt
-const THRESHOLD_BALANCE = 100;    // Ngưỡng cân bằng
-
-const FOOD_DATABASE = [
-  { id: 1, name: "Cơm trắng", caloriesPer100g: 130 },
-  { id: 2, name: "Thịt gà", caloriesPer100g: 239 },
-  { id: 3, name: "Thịt bò", caloriesPer100g: 250 },
-  { id: 4, name: "Cá hồi", caloriesPer100g: 208 },
-  { id: 5, name: "Trứng gà", caloriesPer100g: 155 },
-  { id: 6, name: "Rau cải", caloriesPer100g: 32 },
-  { id: 7, name: "Gạo lức", caloriesPer100g: 111 },
-  { id: 8, name: "Bánh mì", caloriesPer100g: 265 },
-];
+const THRESHOLD_GOOD_BURN = -500;
+const THRESHOLD_BALANCE = 100;
 
 const CaloriesCounting = () => {
+  const [foodList, setFoodList] = useState([]);
   const [selectedFood, setSelectedFood] = useState("");
   const [foodWeight, setFoodWeight] = useState("");
   const [exerciseCalories, setExerciseCalories] = useState("");
   const [foodCalories, setFoodCalories] = useState(0);
   const [calorieBalance, setCalorieBalance] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch foods from API
+  useEffect(() => {
+    const fetchFoods = async () => {
+      try {
+        setLoading(true);
+        // Gọi API để lấy danh sách thực phẩm từ Calories Service
+        const response = await fetch('http://localhost:8005/foods/', {
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (response.ok) {
+          const foods = await response.json();
+          setFoodList(Array.isArray(foods) ? foods : []);
+        } else {
+          // Fallback to mock data nếu API không hoạt động
+          console.warn('Calories API not available, using mock data');
+          setFoodList([
+            { food_id: 1, name: "Cơm trắng", calories_per_100g: 130 },
+            { food_id: 2, name: "Thịt gà", calories_per_100g: 239 },
+            { food_id: 3, name: "Thịt bò", calories_per_100g: 250 },
+            { food_id: 4, name: "Cá hồi", calories_per_100g: 208 },
+            { food_id: 5, name: "Trứng gà", calories_per_100g: 155 },
+            { food_id: 6, name: "Rau cải", calories_per_100g: 32 },
+            { food_id: 7, name: "Gạo lức", calories_per_100g: 111 },
+            { food_id: 8, name: "Bánh mì", calories_per_100g: 265 },
+          ]);
+        }
+      } catch (err) {
+        console.error('Error fetching foods:', err);
+        // Use fallback mock data
+        setFoodList([
+          { food_id: 1, name: "Cơm trắng", calories_per_100g: 130 },
+          { food_id: 2, name: "Thịt gà", calories_per_100g: 239 },
+          { food_id: 3, name: "Thịt bò", calories_per_100g: 250 },
+          { food_id: 4, name: "Cá hồi", calories_per_100g: 208 },
+          { food_id: 5, name: "Trứng gà", calories_per_100g: 155 },
+          { food_id: 6, name: "Rau cải", calories_per_100g: 32 },
+          { food_id: 7, name: "Gạo lức", calories_per_100g: 111 },
+          { food_id: 8, name: "Bánh mì", calories_per_100g: 265 },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFoods();
+  }, []);
 
   const calculateFoodCalories = () => {
-    const food = FOOD_DATABASE.find((f) => f.id === Number(selectedFood));
+    const food = foodList.find((f) => f.food_id === Number(selectedFood) || f.id === Number(selectedFood));
     if (food && foodWeight) {
-      const calories = (food.caloriesPer100g * Number(foodWeight)) / 100;
+      const caloriesPerGram = (food.calories_per_100g || food.caloriesPer100g) / 100;
+      const calories = caloriesPerGram * Number(foodWeight);
       setFoodCalories(calories);
       return calories;
     }
@@ -70,6 +114,10 @@ const CaloriesCounting = () => {
     setCalorieBalance(netCalories);
   };
 
+  if (loading) {
+    return <div className="calories-container"><div>Đang tải dữ liệu...</div></div>;
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 40 }}
@@ -82,6 +130,8 @@ const CaloriesCounting = () => {
           <Flame size={28} color="#60a5fa" /> Calories Counting
         </h2>
 
+        {error && <div className="error-message">{error}</div>}
+
         <div className="form-group">
           <label className="form-label">
             <Knife size={20} /> Chọn thực phẩm
@@ -91,10 +141,10 @@ const CaloriesCounting = () => {
             onChange={(e) => setSelectedFood(e.target.value)}
             className="form-select"
           >
-            <option value="">Chọn loại thức ăn</option>
-            {FOOD_DATABASE.map((food) => (
-              <option key={food.id} value={food.id}>
-                {food.name} ({food.caloriesPer100g} kcal/100g)
+            <option value="" disabled>Chọn loại thức ăn</option>
+            {foodList.map((food) => (
+              <option key={food.food_id || food.id} value={food.food_id || food.id}>
+                {food.name} ({food.calories_per_100g || food.caloriesPer100g} kcal/100g)
               </option>
             ))}
           </select>
@@ -138,7 +188,6 @@ const CaloriesCounting = () => {
           <Calculator size={20} /> Tính toán
         </button>
 
-        {/* Calorie Balance Results */}
         {calorieBalance !== null && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}

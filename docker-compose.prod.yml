@@ -1,0 +1,328 @@
+version: "3.8"
+
+services:
+  # RabbitMQ - Message Queue for Event-Driven Architecture
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: fitness_rabbitmq_prod
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data_prod:/var/lib/rabbitmq
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: on-failure:5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis - Caching layer
+  redis:
+    image: redis:7-alpine
+    container_name: fitness_redis_prod
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_prod:/data
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: on-failure:5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # MySQL Database - Start first
+  db:
+    image: mysql:8.0
+    container_name: fitness_mysql_db_prod
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_INITDB_SKIP_TZINFO: 1
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data_prod:/var/lib/mysql
+      - ./backend/schema:/docker-entrypoint-initdb.d
+    networks:
+      - soa-network
+    command: >
+      --default-storage-engine=InnoDB 
+      --sql-mode="" 
+      --max_connections=1000 
+      --character-set-server=utf8mb4 
+      --collation-server=utf8mb4_unicode_ci
+      --explicit_defaults_for_timestamp=ON
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}", "--silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+    restart: on-failure:5
+    cap_add:
+      - SYS_NICE
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # API Gateway
+  api_gateway:
+    build:
+      context: .
+      dockerfile: backend/services/api_gateway/Dockerfile
+    container_name: fitness_api_gateway_prod
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend/uploads:/app/backend/uploads
+    environment:
+      - SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - USERS_SERVICE_URL=http://users:8002
+      - WORKOUT_SERVICE_URL=http://workout:8003
+      - NUTRITION_SERVICE_URL=http://nutrition:8004
+      - CALORIES_SERVICE_URL=http://calories:8005
+      - PAYMENT_SERVICE_URL=http://payment:8007
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq/
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      users:
+        condition: service_healthy
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: on-failure:5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Users Service
+  users:
+    build:
+      context: .
+      dockerfile: backend/services/users/Dockerfile
+    container_name: fitness_users_service_prod
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./backend/uploads:/app/backend/uploads
+    environment:
+      - DATABASE_URL=mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@db:3306/users_db?charset=utf8mb4
+      - SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq/
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: on-failure:5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Workout Service
+  workout:
+    build:
+      context: .
+      dockerfile: backend/services/workout/Dockerfile
+    container_name: fitness_workout_service_prod
+    ports:
+      - "8003:8003"
+    environment:
+      - DATABASE_URL=mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@db:3306/workout_db?charset=utf8mb4
+      - PAYMENT_SERVICE_URL=http://payment:8007
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq/
+      - REDIS_URL=redis://redis:6379/1
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: on-failure:5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nutrition Service
+  nutrition:
+    build:
+      context: .
+      dockerfile: backend/services/nutrition/Dockerfile
+    container_name: fitness_nutrition_service_prod
+    ports:
+      - "8004:8004"
+    environment:
+      - DATABASE_URL=mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@db:3306/nutrition_db?charset=utf8mb4
+      - CALORIES_SERVICE_URL=http://calories:8005
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq/
+      - REDIS_URL=redis://redis:6379/2
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: on-failure:5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Calories Service
+  calories:
+    build:
+      context: .
+      dockerfile: backend/services/calories/Dockerfile
+    container_name: fitness_calories_service_prod
+    ports:
+      - "8005:8005"
+    environment:
+      - DATABASE_URL=mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@db:3306/calories_db?charset=utf8mb4
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq/
+      - REDIS_URL=redis://redis:6379/3
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: on-failure:5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Payment Service
+  payment:
+    build:
+      context: .
+      dockerfile: backend/services/payment/Dockerfile
+    container_name: fitness_payment_service_prod
+    ports:
+      - "8007:8007"
+    environment:
+      - DATABASE_URL=mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@db:3306/payment_db?charset=utf8mb4
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - SECRET_KEY=${JWT_SECRET_KEY}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq/
+      - REDIS_URL=redis://redis:6379/5
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: on-failure:5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mysql_data_prod:
+  rabbitmq_data_prod:
+  redis_data_prod:
+
+networks:
+  soa-network:
+    driver: bridge
